@@ -1,23 +1,29 @@
 #!/usr/bin/python
+"""Usage: update_packages.py [options]
+
+Updates packages and their documentation from CTAN.
+
+Options:
+  -h, --help               Show this helpful message.
+"""
 
 from collections import defaultdict
+from docopt import docopt
 import json
 import os
 from rich import print
 
-PACKAGE_FILE = "ctan-packages.json"
+from CTAN import PackageList
 
-if __name__ == "__main__":
-    if not os.path.exists(PACKAGE_FILE):
-        print(f"[bold red]Error: [purple]{PACKAGE_FILE}[/] not found![/]")
+SCRIPTDIR = os.path.dirname(os.path.realpath(__file__))
+PACKAGE_FILE = f"{SCRIPTDIR}/../ctan-packages.json"
+APPDATA_FILE = f"{SCRIPTDIR}/../public/pkg-docs.json"
 
-    with open(PACKAGE_FILE, "r") as f:
-        packages = json.loads(f.read())
-
+def analyze_package_list(ctan):
     categories = defaultdict(list)
     pkg_with_docs = []
 
-    for key, package in packages.items():
+    for key, package in ctan.packages.items():
         if not len(package.get("documentation", [])):
             categories["No documentation"].append(key)
             continue
@@ -56,6 +62,7 @@ if __name__ == "__main__":
             else:
                 categories["Exactly one (English) documentation"].append(key)
 
+    print()
     for category, packagelist in categories.items():
         print(f"{category:35s} – {len(packagelist):>5d}")
         examples = packagelist[:50]
@@ -64,5 +71,21 @@ if __name__ == "__main__":
         print(", ".join(examples))
         print()
 
-    with open("pkg-docs.json", "w") as f:
+    return pkg_with_docs
+
+
+if __name__ == "__main__":
+    args = docopt(__doc__)
+
+    ctan = PackageList(PACKAGE_FILE)
+    ctan.update_list()
+
+    try:
+        ctan.update_all_packages()
+    finally:
+        # save progress, even if the script is interrupted
+        ctan.save_datafile()
+
+    pkg_with_docs = analyze_package_list(ctan)
+    with open(APPDATA_FILE, "w") as f:
         f.write(json.dumps(pkg_with_docs))
