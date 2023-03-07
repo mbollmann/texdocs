@@ -70,6 +70,7 @@ class App extends React.Component {
   }
 
   componentDidMount() {
+    document.title = "TeXdocs";
     getData().then((json) => {
       this.setState({
         data: json,
